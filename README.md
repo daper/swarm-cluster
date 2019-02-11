@@ -1,6 +1,6 @@
-## ![swarm.png](/home/david/Software/swarm-environment/resources/swarm.png "Swarm Icon") High Availability Cluster
+## ![swarm.png](https://github.com/daper/swarm-cluster/raw/master/resources/swarm.png "Swarm Icon") High Availability Cluster
 
-This proyect aims to analyze and give an arquitecture solucition for a high availability cluster of a common 3 layer stack; composed by database, app and front-end. In order to achive that purpose it uses the following tools:
+This project aims to analyze and give an arquitecture solucition for a high availability cluster of a common 3 layer stack; composed by database, app and front-end. In order to achive that purpose it uses the following tools:
 
 - __Ansible__ an open-source software provisioning.
 - __CoreOS__ as base operative system. Which comes also with __docker__.
@@ -30,7 +30,7 @@ This proyect aims to analyze and give an arquitecture solucition for a high avai
 
 ### Cluster diagram
 
-![swarm-cluster.png](/home/david/Software/swarm-environment/resources/swarm-cluster.png "Cluster diagram")
+![swarm-cluster.png](https://github.com/daper/swarm-cluster/raw/master/resources/swarm-cluster.png "Cluster diagram")
 
 ### Cluster overview
 
