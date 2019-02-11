@@ -1,0 +1,70 @@
+[all]
+sw-front-1 ansible_ssh_host=<PUBLIC_HOST_IP>
+sw-front-2 ansible_ssh_host=<PUBLIC_HOST_IP>
+sw-node-1 ansible_ssh_host=<PUBLIC_HOST_IP>
+sw-node-2 ansible_ssh_host=<PUBLIC_HOST_IP>
+sw-node-3 ansible_ssh_host=<PUBLIC_HOST_IP>
+sw-proxy-sql ansible_ssh_host=<PUBLIC_HOST_IP>
+sw-db-1 ansible_ssh_host=<PUBLIC_HOST_IP>
+sw-db-2 ansible_ssh_host=<PUBLIC_HOST_IP>
+
+[swarm-advertiser]
+sw-node-1
+
+[swarm-managers]
+sw-node-1
+
+[swarm-workers]
+sw-front-1
+sw-front-2
+sw-node-2
+sw-node-3
+sw-proxy-sql
+sw-db-1
+sw-db-2
+
+[docker-api]
+sw-front-1
+sw-front-2
+
+[fronts]
+sw-front-1
+sw-front-2
+
+[app-nodes]
+sw-node-1
+sw-node-2
+sw-node-3
+
+[sql-proxies]
+sw-proxy-sql
+
+[databases]
+sw-db-1
+sw-db-2
+
+[etcd-cluster]
+sw-node-1
+sw-node-2
+sw-node-3
+
+[mons]
+sw-db-1
+sw-db-2
+
+[osds]
+sw-db-1
+sw-db-2
+
+[rgws]
+sw-proxy-sql
+
+[clients]
+sw-node-1
+sw-node-2
+sw-node-3
+
+[all:vars]
+ansible_ssh_user=core
+ansible_ssh_private_key_file=<SSH_PUBLIC_KEY>
+ansible_python_interpreter="PATH=/home/core/bin:$PATH python"

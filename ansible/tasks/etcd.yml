@@ -1,0 +1,57 @@
+- name: Create etcd config directory
+  file:
+    path: "{{ etcd_conf_dir }}"
+    state: directory
+  tags:
+    - etcd
+
+- name: Create etcd data directory
+  file:
+    path: "{{ etcd_data_dir }}"
+    state: directory
+    owner: etcd
+    group: etcd
+  tags:
+    - etcd
+
+- name: Copy certificates
+  copy:
+    src: "{{ etcd_ca_conf_directory }}/{{ item }}"
+    dest: "{{ etcd_conf_dir }}/{{ item }}"
+    mode: 0640
+    owner: root
+    group: root
+  with_items:
+    - "{{ etcd_certificates }}"
+  tags:
+    - etcd
+
+- name: Combine etcd_settings and etcd_settings_user (if defined)
+  set_fact:
+    etcd_settings: "{{ etcd_settings | combine(etcd_settings_user|default({})) }}"
+  tags:
+    - etcd
+    - etcd-systemd
+
+- name: Create systemd unit file
+  template:
+    src: "{{ playbook_dir }}/templates/etc/systemd/system/etcd.service.j2"
+    dest: /etc/systemd/system/etcd.service
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - reload systemd
+  tags:
+    - etcd
+    - etcd-systemd
+
+- meta: flush_handlers
+
+- name: Enable and start etcd
+  service:
+    name: etcd
+    enabled: yes
+    state: started
+  tags:
+    - etcd

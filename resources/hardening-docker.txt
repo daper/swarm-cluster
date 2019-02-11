@@ -1,0 +1,39 @@
+## /etc/audit/rules.d/20-docker.rules
+-w /usr/bin/docker -p wa
+-w /var/lib/docker -p wa
+-w /etc/docker -p wa
+-w /run/systemd/system/docker.service -p wa
+-w /run/systemd/system/docker.socket -p wa
+-w /etc/default/docker -p wa
+-w /etc/docker/daemon.json -p wa
+-w /usr/bin/docker-containerd -p wa
+-w /usr/bin/docker-runc -p wa
+
+# Reload auditd rules
+systemctl restart audit-rules.service
+
+# See auditd rules
+journalctl -f | grep audit
+
+# Report status of auditd
+auditctl -s
+
+## /etc/docker/daemon.json
+{
+    "icc": false,
+    "userns-remap": "default",
+    "log-driver": "syslog",
+    "disable-legacy-registry": true,
+    "live-restore": true,
+    "userland-proxy": false,
+    "no-new-privileges": true
+}
+
+# Touch sub{u,g}id files
+touch /etc/subuid /etc/subgid
+
+# Reload docker daemon
+systemctl restart docker
+
+# Enable docker content trust
+echo "DOCKER_CONTENT_TRUST=1" | sudo tee -a /etc/environment

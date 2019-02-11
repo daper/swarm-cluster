@@ -1,0 +1,136 @@
+{
+  "calls": [
+    {
+      "ChangeBatch": {
+        "Changes": [
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV4::"
+                }
+              ],
+              "Type": "A",
+              "TTL": 300
+            }
+          },
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV6::"
+                }
+              ],
+              "Type": "AAAA",
+              "TTL": 300
+            }
+          }
+        ]
+      },
+      "HostedZoneId": "/hostedzone/<ZONE_ID>"
+    },
+    {
+      "ChangeBatch": {
+        "Changes": [
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV4::"
+                }
+              ],
+              "Type": "A",
+              "TTL": 300
+            }
+          },
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV6::"
+                }
+              ],
+              "Type": "AAAA",
+              "TTL": 300
+            }
+          }
+        ]
+      },
+      "HostedZoneId": "/hostedzone/<ZONE_ID>"
+    },
+    {
+      "ChangeBatch": {
+        "Changes": [
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV4::"
+                }
+              ],
+              "Type": "A",
+              "TTL": 300
+            }
+          },
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV6::"
+                }
+              ],
+              "Type": "AAAA",
+              "TTL": 300
+            }
+          }
+        ]
+      },
+      "HostedZoneId": "/hostedzone/<ZONE_ID>"
+    },
+    {
+      "ChangeBatch": {
+        "Changes": [
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV4::"
+                }
+              ],
+              "Type": "A",
+              "TTL": 300
+            }
+          },
+          {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "<FQDN>",
+              "ResourceRecords": [
+                {
+                  "Value": "::IPV6::"
+                }
+              ],
+              "Type": "AAAA",
+              "TTL": 300
+            }
+          }
+        ]
+      },
+      "HostedZoneId": "/hostedzone/<ZONE_ID>"
+    }
+  ]
+}

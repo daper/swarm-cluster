@@ -1,0 +1,78 @@
+version: '3.5'
+
+services:
+  mon:
+    image: ceph/daemon
+    volumes:
+      - ceph-config:/etc/ceph
+      - /etc/ssl:/etc/ssl:ro
+      - ceph-lib:/var/lib/ceph
+      - type: bind
+        source: /dev
+        target: /dev
+    networks:
+      - hostnet
+    environment:
+      - CEPH_PUBLIC_NETWORK=192.168.1.0/24
+      - KV_TYPE=etcd
+      - KV_IP=192.168.1.1
+    entrypoint: bash
+    #command: -c "MON_IP=\"$$(ip addr show dev eth0 | grep \"inet \" | sed -r 's/.*inet ([0-9\.]+).*/\\1/'):6789\" MON_NAME=$${HOSTNAME} /opt/ceph-container/bin/entrypoint.sh mon"
+    # this is because of no registry yet... :@
+    command: |
+      -c "
+      mkdir -p /var/log/ceph
+      touch /var/log/ceph/ceph.log
+      chown ceph:ceph /var/log/ceph/ceph.log
+      tail -f /var/log/ceph/ceph.log /proc/self/fd/1 &
+      export MON_IP=\"$$(ip addr show dev eth0 | grep \"inet \" | sed -r 's/.*inet ([0-9\.]+).*/\\1/'):6789\"
+      export MON_NAME=$${HOSTNAME}
+      export KV_CA_CERT=/etc/ssl/$${HOSTNAME}.ca.crt
+      export KV_CLIENT_CERT=/etc/ssl/$${HOSTNAME}.crt
+      export KV_CLIENT_KEY=/etc/ssl/$${HOSTNAME}.key
+      /opt/ceph-container/bin/entrypoint.sh mon"
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.labels.type == database
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+    stop_grace_period: 15s
+
+volumes:
+  ceph-lib:
+  ceph-config:
+
+networks:
+  hostnet:
+    external: true
+    name: host
+
+# docker run --rm -it --name etcd-browser \
+#   --net host \
+#   -e ETCD_HOST=192.168.1.1 \
+#   -e ETCD_PORT=2379 \
+#   -e ETCDCTL_CA_FILE=/etc/ssl/sw-node-1.ca.crt \
+#   -e ETCDCTL_CERT_FILE=/etc/ssl/sw-node-1.crt \
+#   -e ETCDCTL_KEY_FILE=/etc/ssl/sw-node-1.key \
+#   -v /etc/ssl/sw-node-1.ca.crt:/etc/ssl/sw-node-1.ca.crt \
+#   -v /etc/ssl/sw-node-1.crt:/etc/ssl/sw-node-1.crt \
+#   -v /etc/ssl/sw-node-1.key:/etc/ssl/sw-node-1.key \
+#   etcd-browser
+
+# docker run --rm -it --name ceph-daemon \
+#   --net=host --privileged=true --pid=host \
+#   -v /var/lib/ceph:/var/lib/ceph \
+#   -v /etc/ceph:/etc/ceph \
+#   -v /etc/ssl:/etc/ssl \
+#   -e KV_TYPE=etcd \
+#   -e KV_IP=192.168.1.1 \
+#   -e KV_CA_CERT=/etc/ssl/sw-db-1.ca.crt \
+#   -e KV_CLIENT_CERT=/etc/ssl/sw-db-1.crt \
+#   -e KV_CLIENT_KEY=/etc/ssl/sw-db-1.key \
+#   --entrypoint bash \
+#   ceph/daemon

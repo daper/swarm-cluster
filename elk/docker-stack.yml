@@ -1,0 +1,103 @@
+version: '3.3'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.6.0
+    hostname: "{{.Node.Hostname}}-elasticsearch"
+    deploy:
+      restart_policy:
+        condition: any
+      mode: global
+    environment:
+      network.host: _eth0:ipv4_
+      discovery.type: zen
+      discovery.zen.ping.unicast.hosts: tasks.elasticsearch
+      cluster.name: myclustername
+    networks:
+      - elastinet
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  cerebro:
+    image: 'yannart/cerebro'
+    ports:
+      - "8080:9000"
+    deploy:
+      restart_policy:
+        condition: any
+    networks:
+      - elastinet
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana-oss:6.6.0
+    ports:
+      - "5601:5601"
+    deploy:
+      restart_policy:
+        condition: any
+    networks:
+      - elastinet
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat-oss:6.6.0
+    hostname: "{{.Node.Hostname}}-filebeat"
+    user: root
+    volumes:
+      - /var/log/:/var/log/:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+    networks:
+      - elastinet
+    configs:
+      - source: filebeat-config
+        target: /usr/share/filebeat/filebeat.yml
+
+  journalbeat:
+    image: docker.elastic.co/beats/journalbeat-oss:6.6.0
+    hostname: "{{.Node.Hostname}}-journalbeat"
+    user: root
+    volumes:
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+    environment:
+      LOG_LEVEL: warning
+    deploy:
+      mode: global
+    networks:
+      - elastinet
+    configs:
+      - source: journalbeat-config
+        target: /usr/share/journalbeat/journalbeat.yml
+
+  # Deploy this with ./deployPacketbeat.sh until the guys on
+  # docker makes --privileged available on swarm
+  # packetbeat:
+  #   image: docker.elastic.co/beats/packetbeat-oss:6.6.0
+  #   hostname: "{{.Node.Hostname}}-packetbeat"
+  #   user: root:packetbeat
+  #   entrypoint: bash
+  #   command: -c "chmod +x ./packetbeat && ./packetbeat --strict.perms=false"
+  #   deploy:
+  #     mode: global
+  #   networks:
+  #     - elastinet
+  #   configs:
+  #     - source: packetbeat-config
+  #       target: /usr/share/packetbeat/packetbeat.yml
+
+configs:
+  filebeat-config:
+    file: ./filebeat.yml
+  journalbeat-config:
+    file: ./journalbeat.yml
+  packetbeat-config:
+    file: ./packetbeat.yml
+
+networks:
+  elastinet:
+    driver: overlay
+    attachable: true
+
+volumes:
+  esdata:

@@ -1,0 +1,125 @@
+- name: Set facts
+  hosts: all
+  gather_facts: true
+  tasks:
+    - set_fact:
+        ceph_conf_dir: /etc/ceph
+        ceph_ssl_dir: /etc/ssl
+        ceph_data_dir: /var/lib/ceph
+        ceph_log_dir: /var/log/ceph
+        osd_device: /dev/vdb
+    - set_fact:
+        ceph_public_network: 192.168.1.0/24
+        kv_type: etcd
+        kv_ip: "192.168.1.1"
+        kv_ca_cert: "{{ hostvars[inventory_hostname].ceph_ssl_dir }}/{{ inventory_hostname }}.ca.crt"
+        kv_client_cert: "{{ hostvars[inventory_hostname].ceph_ssl_dir }}/{{ inventory_hostname }}.crt"
+        kv_client_key: "{{ hostvars[inventory_hostname].ceph_ssl_dir }}/{{ inventory_hostname }}.key"
+        mon_name: "{{ inventory_hostname }}"
+        mon_ip: "${COREOS_PUBLIC_IPV4}:6789"
+
+- name: Install tools
+  hosts: all
+  gather_facts: false
+  become: yes
+  tasks:
+    - stat:
+        path: /root/ceph-tools
+      register: cepth_tools_dir
+    - copy:
+        src: "{{ playbook_dir }}/../../ceph/tools"
+        dest: /root
+      when: cepth_tools_dir.stat.exists == False
+    - docker_image:
+        name: ceph/install-utils
+        state: present
+        path: /root/tools
+    - docker_container:
+        name: ceph_utils
+        state: started
+        image: ceph/install-utils
+        entrypoint: sh
+        command: /startup.sh
+        volumes:
+          - /opt/bin:/opt/bin
+    - docker_container:
+        name: ceph_utils
+        state: absent
+    - file:
+        path: /root/tools
+        state: absent
+    - command: chmod +x /opt/bin/ceph /opt/bin/ceph-disk /opt/bin/rados /opt/bin/rbd
+
+- name: Populate etcd
+  hosts: "{{ groups['etcd-cluster'][0] }}"
+  gather_facts: false
+  tasks:
+    - debug:
+        var: hostvars[inventory_hostname].ceph_ssl_dir
+    - docker_container:
+        state: started
+        image: ceph/daemon
+        name: ceph_populate_kvstore
+        env:
+          KV_TYPE: "{{ hostvars[inventory_hostname].kv_type }}"
+          KV_IP: "{{ hostvars[inventory_hostname].kv_ip }}"
+          KV_CA_CERT: "{{ hostvars[inventory_hostname].kv_ca_cert }}"
+          KV_CLIENT_CERT: "{{ hostvars[inventory_hostname].kv_client_cert }}"
+          KV_CLIENT_KEY: "{{ hostvars[inventory_hostname].kv_client_key }}"
+        volumes:
+          - "{{ hostvars[inventory_hostname].ceph_ssl_dir }}:{{ hostvars[inventory_hostname].ceph_ssl_dir }}"
+        command:
+          - /opt/ceph-container/bin/entrypoint.sh
+          - populate_kvstore
+    - docker_container:
+        name: ceph_populate_kvstore
+        state: absent
+
+- name: Create ceph mons
+  hosts: mons
+  gather_facts: false
+  become: yes
+  tasks:
+    - name: Create conf directory
+      file:
+        path: "{{ ceph_conf_dir }}"
+        state: directory
+    - name: Create data directory
+      file:
+        path: "{{ ceph_data_dir }}"
+        state: directory
+    - name: Copy service file
+      template:
+        src: etc/systemd/system/ceph-mon.service.j2
+        dest: /etc/systemd/system/ceph-mon.service
+        owner: root
+        group: root
+        mode: 0644
+    - name: Start mon service
+      systemd:
+        daemon_reload: yes
+        enabled: yes
+        name: ceph-mon.service
+        state: started
+
+- name: Create ceph osds
+  hosts: osds
+  gather_facts: false
+  become: yes
+  tasks:
+    - name: Prepare disks
+      docker_container:
+        state: started
+        image: ceph/daemon
+        name: ceph_populate_kvstore
+        env:
+          OSD_DEVICE: "{{ hostvars[inventory_hostname].osd_device }}"
+          OSD_FORCE_ZAP: "1"
+          KV_TYPE: "{{ hostvars[inventory_hostname].kv_type }}"
+          KV_IP: "{{ hostvars[inventory_hostname].kv_ip }}"
+          KV_CA_CERT: "{{ hostvars[inventory_hostname].kv_ca_cert }}"
+          KV_CLIENT_CERT: "{{ hostvars[inventory_hostname].kv_client_cert }}"
+          KV_CLIENT_KEY: "{{ hostvars[inventory_hostname].kv_client_key }}"
+        volumes:
+          - "{{ hostvars[inventory_hostname].ceph_ssl_dir }}:{{ hostvars[inventory_hostname].ceph_ssl_dir }}"
+        command: ceph-volume lvm prepare --data /dev/vdb

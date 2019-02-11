@@ -1,0 +1,38 @@
+[Unit]
+Description=Ceph OSD
+After=docker.service
+
+; You can mount your OSD directories when needed
+; with something like this:
+;RequiresMountsFor=/var/lib/ceph/osd/ceph-%i
+
+[Service]
+EnvironmentFile=-/etc/environment
+Environment=HOSTNAME=%H
+ExecStartPre=-/usr/bin/docker kill %p
+ExecStartPre=-/usr/bin/docker rm %p
+ExecStart=/usr/bin/docker run --rm --name %p --net=host \
+   --privileged=true \
+   --pid=host \
+   -e JOURNAL_DIR={{ ceph_data_dir }}/osd/journal \
+   -e HOSTNAME=${HOSTNAME} \
+   -e OSD_DEVICE={{ osd_device }} \
+   -e OSD_FORCE_ZAP=1 \
+   -e MON_NAME={{ mon_name }} \
+   -e KV_TYPE={{ kv_type }} \
+   -e KV_IP={{ kv_ip }} \
+   -e KV_CA_CERT={{ kv_ca_cert }} \
+   -e KV_CLIENT_CERT={{ kv_client_cert }} \
+   -e KV_CLIENT_KEY={{ kv_client_key }} \
+   -v {{ ceph_data_dir }}:/var/lib/ceph \
+   -v {{ ceph_conf_dir }}:/etc/ceph \
+   -v {{ ceph_ssl_dir }}:{{ ceph_ssl_dir }} \
+   -v {{ ceph_log_dir }}:{{ ceph_log_dir }} \
+   -v /dev/:/dev/ \
+   ceph/daemon osd
+ExecStopPost=-/usr/bin/docker stop %p
+ExecStopPost=-/usr/bin/docker rm %p
+Restart=always
+RestartSec=10s
+TimeoutStartSec=120
+TimeoutStopSec=15

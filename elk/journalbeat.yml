@@ -1,0 +1,24 @@
+journalbeat.inputs:
+- paths: []
+  seek: cursor
+
+processors:
+- add_cloud_metadata: ~
+
+output.elasticsearch:
+  hosts: '${ELASTICSEARCH_HOSTS:elasticsearch:9200}'
+  username: '${ELASTICSEARCH_USERNAME:}'
+  password: '${ELASTICSEARCH_PASSWORD:}'
+
+setup.dashboards.enabled: true
+setup.dashboards.retry.enabled: true
+
+setup.kibana:
+  protocol: "http"
+  host: '${KIBANA_HOST:kibana:5601}'
+  username: '${ELASTICSEARCH_USERNAME:}'
+  password: '${ELASTICSEARCH_PASSWORD:}'
+  ssl.enabled: false
+
+logging.level: ${LOG_LEVEL:info}
+logging.to_files: false

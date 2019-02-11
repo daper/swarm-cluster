@@ -1,0 +1,8 @@
+sw-front-1 ansible_ssh_host=140.82.59.185 private_ip=192.168.1.1
+sw-front-2 ansible_ssh_host=95.179.151.230 private_ip=192.168.1.2
+sw-node-1 ansible_ssh_host=95.179.148.32 private_ip=192.168.1.3
+sw-node-2 ansible_ssh_host=95.179.181.251 private_ip=192.168.1.4
+sw-node-3 ansible_ssh_host=95.179.146.97 private_ip=192.168.1.5
+sw-proxy-sql ansible_ssh_host=185.92.221.56 private_ip=192.168.1.6
+sw-db-1 ansible_ssh_host=45.76.37.180 private_ip=192.168.1.7
+sw-db-2 ansible_ssh_host=95.179.138.25 private_ip=192.168.1.8

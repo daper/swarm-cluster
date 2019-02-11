@@ -1,0 +1,148 @@
+
+- name: "bootstrap coreos hosts with ansible"
+  hosts: all
+  gather_facts: false
+  roles:
+    - defunctzombie.coreos-bootstrap
+  tasks:
+    - name: Install docker-py
+      pip:
+        name: docker-py
+
+- name: "bootstrap coreos hosts with custom script"
+  hosts: all
+  gather_facts: false
+  remote_user: root
+  become: yes
+  become_method: sudo
+  vars:
+    configure_private_net: true
+    private_if: eth1
+  tasks:
+    - name: Run boot.sh
+      script: "{{ playbook_dir }}/../resources/boot.sh"
+      args:
+        creates: /opt/bin/docker-compose
+    - name: Correct the hostname
+      command: "hostnamectl --static --transient set-hostname {{ inventory_hostname }}"
+    - name: Get private ip
+      shell: "ip addr show dev {{ private_if }} | grep \"inet \" | sed -r 's/.*inet ([0-9\\.]+).*/\\1/'"
+      register: get_private_ip
+    - debug:
+        msg: "Private IP for {{ inventory_hostname }} is {{ get_private_ip.stdout }}"
+    - set_fact:
+        private_if: "{{ private_if }}"
+    - name: Override private_ip
+      set_fact:
+        private_ip: "{{ get_private_ip.stdout }}"
+      when: configure_private_net == false
+    - name: Check if private networking is set up
+      shell: ip addr show dev {{ private_if }}
+      register: eth1
+      when: configure_private_net
+    - name: Configure private networking
+      copy:
+        dest: "/etc/systemd/network/private.network"
+        content: |
+          [Match]
+          Name={{ private_if }}
+
+          [Network]
+          Address={{ private_ip }}/24
+      when: 'configure_private_net and private_ip not in eth1.stdout'
+    - name: Bring up private interface
+      command: systemctl restart systemd-networkd
+      when: 'configure_private_net and private_ip not in eth1.stdout'
+    - name: Restart docker daemon
+      command: systemctl restart docker
+      when: 'configure_private_net and private_ip not in eth1.stdout'
+    - name: Setup /etc/hosts file
+      lineinfile: dest=/etc/hosts regexp='^.*{{ item }}$' line="{{ hostvars[item].private_ip }} {{item}}" state=present
+      with_inventory_hostnames:
+        - all
+      # when: 'private_ip not in eth1.stdout'
+    - name: Get docker info
+      shell: docker info
+      register: docker_info
+      changed_when: False
+      when: docker_info is not defined
+
+- name: Generate local certs
+  hosts: localhost
+  vars:
+    ansible_connection: local
+  tasks:
+    - include_tasks: "{{ playbook_dir }}/tasks/certs.yml"
+
+- name: Send TLS certificates to hosts
+  hosts: all
+  remote_user: root
+  become: yes
+  become_method: sudo
+  tasks:
+    - name: Make ssl directory
+      file:
+        path: /etc/ssl
+        state: directory
+      when: hostvars['localhost'].make_certs
+    - name: Copy certificates
+      copy:
+        src: "../certs/{{ item }}"
+        dest: "/etc/ssl/{{ item }}"
+        mode: 0640
+        owner: root
+        group: root
+      with_items:
+          - "{{ inventory_hostname }}.ca.crt"
+          - "{{ inventory_hostname }}.crt"
+          - "{{ inventory_hostname }}.key"
+      when: hostvars['localhost'].make_certs
+
+- name: "bootstrap coreos etcd cluster"
+  gather_facts: True
+  remote_user: root
+  become: yes
+  become_method: sudo
+  hosts: etcd-cluster
+  vars:
+    ca_cert_name: "{{ inventory_hostname }}.ca.crt"
+    cert_name: "{{ inventory_hostname }}.crt"
+    key_name: "{{ inventory_hostname }}.key"
+  tasks:
+    - include_role:
+        name: githubixx.etcd
+        tasks_from: "{{ playbook_dir }}/tasks/etcd.yml"
+      vars:
+        etcd_host_group: etcd-cluster
+        etcd_interface: "{{ hostvars[inventory_hostname].private_if }}"
+        etcd_ca_conf_directory: "{{ playbook_dir }}/../certs"
+        etcd_certificates:
+          - "{{ ca_cert_name }}"
+          - "{{ cert_name }}"
+          - "{{ key_name }}"
+        etcd_settings_user:
+          cert-file: "/etc/ssl/certs/{{ ca_cert_name }}"
+          key-file: "/etc/ssl/certs/{{ key_name }}"
+          peer-cert-file: "/etc/ssl/certs/{{ cert_name }}"
+          peer-key-file: "/etc/ssl/certs/{{ key_name }}"
+          peer-trusted-ca-file: "/etc/ssl/certs/{{ ca_cert_name }}"
+          peer-client-cert-auth: "true"
+          client-cert-auth: "true"
+          trusted-ca-file: "/etc/ssl/certs/{{ ca_cert_name }}"
+    - name: Setup environment for etcdctl
+      copy:
+        dest: /etc/profile.d/01-etcd.sh
+        mode: 0644
+        owner: root
+        group: root
+        content: |
+          export ETCDCTL_CA_FILE=/etc/etcd/{{ ca_cert_name }}
+          export ETCDCTL_CERT_FILE=/etc/etcd/{{ cert_name }}
+          export ETCDCTL_KEY_FILE=/etc/etcd/{{ key_name }}
+          export ETCDCTL_ENDPOINT=https://{{ private_ip }}:2379
+
+- import_playbook: "{{ playbook_dir }}/playbooks/swarm.yml"
+
+- import_playbook: "{{ playbook_dir }}/playbooks/labels.yml"
+
+- import_playbook: "{{ playbook_dir }}/playbooks/hardening.yml"

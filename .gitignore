@@ -1,0 +1,6 @@
+certs/*.crt
+certs/*.key
+certs/.etcd-ca
+ansible/*.retry
+ansible/hosts.*
+ansible/roles

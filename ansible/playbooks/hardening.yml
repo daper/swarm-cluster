@@ -1,0 +1,105 @@
+- name: Harden docker host
+  hosts: all
+  gather_facts: False
+  remote_user: root
+  become: yes
+  become_method: sudo
+  tasks:
+    - name: Create auditd rules for docker
+      copy:
+        dest: /etc/audit/rules.d/20-docker.rules
+        content: |
+          -w /usr/bin/docker -p wa
+          -w /run/torcx/bin/docker -p x -k docker
+          -w /var/lib/docker -p wa
+          -w /etc/docker -p wa
+          -w /run/systemd/system/docker.service -p wa
+          -w /run/systemd/system/docker.socket -p wa
+          -w /etc/default/docker -p wa
+          -w /etc/docker/daemon.json -p wa
+          -w /usr/bin/docker-containerd -p wa
+          -w /usr/bin/docker-runc -p wa
+          -w /etc/ssl/{{ inventory_hostname }}.ca.crt -p war
+          -w /etc/ssl/{{ inventory_hostname }}.crt -p war
+          -w /etc/ssl/{{ inventory_hostname }}.key -p war
+      register: audit_rules
+    - name: Restart auditd service
+      systemd:
+        name: audit-rules
+        state: restarted
+      when: audit_rules.changed
+    - name: Create docker daemon.json
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+              "icc": false,
+              "disable-legacy-registry": true,
+              "live-restore": false,
+              "userland-proxy": false,
+              "no-new-privileges": true,
+              "experimental": true
+          }
+      register: daemon_json
+    - name: Touch sub{u,g}id files
+      command: touch /etc/subuid /etc/subgid
+      args:
+        warn: no
+        creates:
+          - /etc/subuid
+          - /etc/subgid
+      when: daemon_json.changed
+    - name: Restart docker service
+      systemd:
+        name: docker
+        state: restarted
+      when: daemon_json.changed
+    # - name: Enable docker content trust
+    #   lineinfile:
+    #     path: /etc/environment
+    #     line: DOCKER_CONTENT_TRUST=1
+    - name: Remove docker-bench-security.log
+      file:
+        path: /root/docker-bench-security.log
+        state: absent
+      when: daemon_json.changed
+
+- name: Running docker-bench-security
+  hosts: all
+  gather_facts: False
+  remote_user: root
+  become: yes
+  become_method: sudo
+  tasks:
+    - name: Check if bench has already run
+      stat: 
+        path: /root/docker-bench-security.log
+      register: bench_log
+    - name: Clone docker-bench-security
+      git:
+        repo: 'https://github.com/docker/docker-bench-security'
+        dest: /root/docker-bench-security
+        version: 6d5b15788ab06f35464deee6017badbf07fa5900
+      when: bench_log.stat.exists == False
+    - name: Run docker-bench-security
+      command:
+      args:
+        chdir: /root/docker-bench-security
+        argv:
+          - ./docker-bench-security.sh
+          - -b
+          - -l
+          - /root/docker-bench-security.log
+        creates:
+          - /root/docker-bench-security.log
+          - /root/docker-bench-security.log.json
+      register: bench
+      when: bench_log.stat.exists == False
+    - debug:
+        msg: "{{ bench.stdout_lines | map('regex_search', '(Score: ([0-9]+))|(^.WARN. (.+)$)') | reject('none') | list }}"
+      when: bench_log.stat.exists == False
+    - name: Remove docker-bench-security
+      file:
+        path: /root/docker-bench-security
+        state: absent
+      when: bench_log.stat.exists == False

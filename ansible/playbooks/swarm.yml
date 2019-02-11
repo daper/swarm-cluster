@@ -1,0 +1,87 @@
+- name: "the first of its name"
+  hosts: swarm-advertiser
+  gather_facts: False
+  tasks:
+    - name: "create primary swarm manager"
+      shell: docker swarm init --advertise-addr {{ private_ip }}
+      when: "docker_info.stdout.find('Swarm: inactive') != -1"
+
+    - name: "get docker swarm manager token"
+      shell: "docker swarm join-token -q manager"
+      register: manager_token
+
+    - name: "get docker swarm worker token"
+      shell: "docker swarm join-token -q worker"
+      register: worker_token
+
+    - set_fact:
+        advertise_addr: "{{ private_ip }}"
+        manager_token: "{{ manager_token.stdout }}"
+        worker_token: "{{ worker_token.stdout }}"
+
+- name: Boot up the rest of swarm managers
+  hosts: swarm-managers:!swarm-advertiser
+  gather_facts: False
+  tasks:
+    - name: "join as a manager"
+      shell: docker swarm join --token {{ hostvars[groups["swarm-advertiser"][0]].manager_token }} {{ hostvars[groups["swarm-advertiser"][0]].advertise_addr }}:2377
+      when: "docker_info.stdout.find('Swarm: inactive') != -1"
+      retries: 3
+      delay: 20
+
+- name: Boot up swarm workers
+  hosts: swarm-workers
+  gather_facts: False
+  tasks:
+    - name: "join as a worker"
+      shell: docker swarm join --token {{ hostvars[groups["swarm-advertiser"][0]].worker_token }} {{ hostvars[groups["swarm-advertiser"][0]].advertise_addr }}:2377
+      when: "docker_info.stdout.find('Swarm: inactive') != -1"
+      retries: 3
+      delay: 20
+
+- name: Publish docker API
+  remote_user: root
+  become: yes
+  become_method: sudo
+  hosts: swarm-managers
+  gather_facts: False
+  tasks:
+    - name: Creates socket file for API port
+      copy:
+        dest: /etc/systemd/system/docker-tcp.socket
+        owner: root
+        group: root
+        mode: 0644
+        content: |
+          [Unit]
+          Description=Docker Socket for the API
+
+          [Socket]
+          ListenStream=2375
+          BindIPv6Only=both
+          Service=docker.service
+
+          [Install]
+          WantedBy=sockets.target
+      register: docker_tcp_socket
+    - name: Enable docker-tcp.socket
+      systemd:
+        daemon_reload: yes
+        name: docker-tcp.socket
+        enabled: yes
+      when: docker_tcp_socket.changed
+    - name: Stops docker service
+      systemd:
+        name: docker
+        state: stopped
+      when: docker_tcp_socket.changed
+    - name: Starts docker socket
+      systemd:
+        name: docker-tcp.socket
+        state: started
+      when: docker_tcp_socket.changed
+    - name: Start docker service
+      systemd:
+        name: docker
+        state: started
+      when: docker_tcp_socket.changed

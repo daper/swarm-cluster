@@ -1,0 +1,51 @@
+- name: Label database nodes
+  hosts: databases
+  gather_facts: False
+  environment:
+    DOCKER_HOST: "{{ hostvars[groups['swarm-managers'][0]].private_ip }}"
+  tasks:
+    - name: Check unlabeled
+      command: "docker node inspect {{ inventory_hostname }} --format '{{ '{{' }}.Spec.Labels{{ '}}' }}'"
+      register: unlabeled_test
+    - name: Label databases if proceed
+      command: "docker node update --label-add type=database {{ inventory_hostname }}"
+      when: "'type:database' not in unlabeled_test.stdout"
+
+- name: Label sql-proxy nodes
+  hosts: sql-proxies
+  gather_facts: False
+  environment:
+    DOCKER_HOST: "{{ hostvars[groups['swarm-managers'][0]].private_ip }}"
+  tasks:
+    - name: Check unlabeled
+      command: "docker node inspect {{ inventory_hostname }} --format '{{ '{{' }}.Spec.Labels{{ '}}' }}'"
+      register: unlabeled_test
+    - name: Label sql-proxies if proceed
+      command: "docker node update --label-add type=sql-proxy {{ inventory_hostname }}"
+      when: "'type:sql-proxy' not in unlabeled_test.stdout"
+
+- name: Label app nodes
+  hosts: app-nodes
+  gather_facts: False
+  environment:
+    DOCKER_HOST: "{{ hostvars[groups['swarm-managers'][0]].private_ip }}"
+  tasks:
+    - name: Check unlabeled
+      command: "docker node inspect {{ inventory_hostname }} --format '{{ '{{' }}.Spec.Labels{{ '}}' }}'"
+      register: unlabeled_test
+    - name: Label app-nodes if proceed
+      command: "docker node update --label-add type=app {{ inventory_hostname }}"
+      when: "'type:app' not in unlabeled_test.stdout"
+
+- name: Label front nodes
+  hosts: fronts
+  gather_facts: False
+  environment:
+    DOCKER_HOST: "{{ hostvars[groups['swarm-managers'][0]].private_ip }}"
+  tasks:
+    - name: Check unlabeled
+      command: "docker node inspect {{ inventory_hostname }} --format '{{ '{{' }}.Spec.Labels{{ '}}' }}'"
+      register: unlabeled_test
+    - name: Label fronts if proceed
+      command: "docker node update --label-add type=front {{ inventory_hostname }}"
+      when: "'type:front' not in unlabeled_test.stdout"
