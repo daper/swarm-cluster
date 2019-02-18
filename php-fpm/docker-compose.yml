@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  fpm:
+    image: sw-node-1:5000/php-fpm
+    networks:
+      - appnet
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.labels.type == app
+
+networks:
+  appnet:
+    external: true

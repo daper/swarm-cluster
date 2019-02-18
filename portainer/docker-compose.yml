@@ -34,7 +34,10 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == app]
+        constraints:
+          - node.labels.type == app
+
+
 
 networks:
   portainet:
@@ -42,6 +45,8 @@ networks:
   appnet:
     external: true
   frontnet: # this network too ^
+    external: true
+  dbnet:
     external: true
 
 volumes:

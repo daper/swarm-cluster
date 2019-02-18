@@ -2,7 +2,7 @@ version: "3"
 
 services:
   nginx:
-    image: daper/nginx
+    image: sw-node-1:5000/nginx
     ports:
       - 80:80
       - 443:443

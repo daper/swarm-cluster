@@ -22,22 +22,22 @@
 + Create ETCD cluster (3/5) nodes with Ansible.
 	+ With TLS (must).
 + Bootstrap swarm cluster.
-	- With ETCD (?).
+	+ With TLS.
 + Automate node labeling.
 + Docker hardening.
 	+ Publish docker API for management.
-	- Make docker to use TLS.
+	+ Make docker to use TLS.
 		* all services must take care of this.
 	- Rootless containers.
 		* Stoppers: ceph, packetbeat.
-- CoreOS hardening (boot.sh makes some :/).
++ CoreOS hardening (boot.sh makes some :/).
 - Automate DNS record updating for each service.
 	* on Route53 with Ansible.
 
 [monitoring]
 + portainer.
 	+ with agents.
-	- with registry.
+	+ with registry.
 		* depends on docker TLS.
 + prometheus.
 	+ node exporter.
@@ -66,12 +66,13 @@
 + Database.
 	+ sql proxy.
 	+ xtradb cluster.
-- Backend.
-	- Wordpress with PHP.
-		* Try to rescue my old (not quite) PHP compile proyect.
-	- Fine tune PHP.
-- Frontend.
-	- Nginx.
++ Backend.
+	+ PHP-FPM.
+	+ Fine tune PHP.
+	- Redis cluster.
++ Frontend.
+	+ Nginx.
+	+ ModSecurity.
 
 [extra]
 + resources/task-completion.sh for this.

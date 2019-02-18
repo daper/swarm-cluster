@@ -26,8 +26,8 @@
         private_if: "{{ private_if }}"
     - name: Override private_ip
       set_fact:
-        private_ip: "{{ get_private_ip.stdout }}"
-      when: configure_private_net == false
+        private_ip: "{{ get_private_ip.stdout_lines[0] if not configure_private_net else private_ip }}"
+      when: not configure_private_net
     - name: Check if private networking is set up
       shell: ip addr show dev {{ private_if }}
       register: eth1
@@ -59,36 +59,7 @@
       changed_when: False
       when: docker_info is not defined
 
-- name: Generate local certs
-  hosts: localhost
-  vars:
-    ansible_connection: local
-  tasks:
-    - include_tasks: "{{ playbook_dir }}/tasks/certs.yml"
-
-- name: Send TLS certificates to hosts
-  hosts: all
-  remote_user: root
-  become: yes
-  become_method: sudo
-  tasks:
-    - name: Make ssl directory
-      file:
-        path: /etc/ssl
-        state: directory
-      when: hostvars['localhost'].make_certs
-    - name: Copy certificates
-      copy:
-        src: "../certs/{{ item }}"
-        dest: "/etc/ssl/{{ item }}"
-        mode: 0640
-        owner: root
-        group: root
-      with_items:
-          - "{{ inventory_hostname }}.ca.crt"
-          - "{{ inventory_hostname }}.crt"
-          - "{{ inventory_hostname }}.key"
-      when: hostvars['localhost'].make_certs
+- import_playbook: "{{ playbook_dir }}/playbooks/certs.yml"
 
 - name: "bootstrap coreos etcd cluster"
   gather_facts: True
@@ -97,9 +68,9 @@
   become_method: sudo
   hosts: etcd-cluster
   vars:
-    ca_cert_name: "{{ inventory_hostname }}.ca.crt"
-    cert_name: "{{ inventory_hostname }}.crt"
-    key_name: "{{ inventory_hostname }}.key"
+    ca_cert_name: "ca.pem"
+    cert_name: "{{ inventory_hostname }}.pem"
+    key_name: "{{ inventory_hostname }}-key.pem"
   tasks:
     - include_role:
         name: githubixx.etcd
@@ -113,7 +84,7 @@
           - "{{ cert_name }}"
           - "{{ key_name }}"
         etcd_settings_user:
-          cert-file: "/etc/ssl/certs/{{ ca_cert_name }}"
+          cert-file: "/etc/ssl/certs/{{ cert_name }}"
           key-file: "/etc/ssl/certs/{{ key_name }}"
           peer-cert-file: "/etc/ssl/certs/{{ cert_name }}"
           peer-key-file: "/etc/ssl/certs/{{ key_name }}"

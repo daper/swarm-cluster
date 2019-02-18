@@ -1,0 +1,89 @@
+- name: Generate local certs
+  hosts: localhost
+  vars:
+    ansible_connection: local
+  tasks:
+    - set_fact:
+        make_certs: False
+
+    - name: Check cfssl docker image
+      command: "docker images daper/cfssl -q"
+      register: cfssl
+
+    - name: Build cfssl docker image
+      docker_image:
+        path: "{{ playbook_dir }}/../../certs"
+        name: daper/cfssl
+      when: cfssl.stdout != ""
+
+    - name: Check for existing certificates
+      stat:
+        path: "{{ playbook_dir }}/../../certs/{{ item }}.pem"
+      register: certs_stats
+      with_inventory_hostnames:
+        - all
+
+    - name: Decide wether to generate certificates
+      set_fact:
+        make_certs: True
+      when: |
+        certs_stats.results 
+        | map(attribute='stat') 
+        | selectattr('exists', 'equalto', False) 
+        | list | count > 0
+
+    - name: Check for existing ca
+      stat:
+        path: "{{ playbook_dir }}/../../certs/ca.pem"
+      register: cfssl_stat
+
+    - name: Initialize ca
+      command: ./gen.sh ca
+      args:
+        chdir: '{{ playbook_dir }}/../../certs'
+      when: cfssl_stat.stat.exists == False
+
+    - name: "Make certificates for every host"
+      command: "./gen.sh {{ item }} {{ hostvars[item].private_ip }} {{ hostvars[item].ansible_ssh_host }}"
+      args:
+        chdir: '{{ playbook_dir }}/../../certs'
+      with_inventory_hostnames:
+        - all
+      when: make_certs
+
+- name: Send TLS certificates to hosts
+  hosts: all
+  remote_user: root
+  become: yes
+  become_method: sudo
+  gather_facts: false
+  tasks:
+    - name: block
+      when: hostvars['localhost'].make_certs
+      block:
+        - name: Make ssl directory
+          file:
+            path: /etc/ssl
+            state: directory
+        - name: Copy certificates
+          copy:
+            src: "{{ playbook_dir }}/../../certs/{{ item }}"
+            dest: "/etc/ssl/{{ item }}"
+            mode: 0640
+            owner: root
+            group: root
+          with_items:
+              - "ca.pem"
+              - "{{ inventory_hostname }}-key.pem"
+              - "{{ inventory_hostname }}.pem"
+
+        - name: link new Root CA
+          command: ln -sf ../ca.pem /etc/ssl/certs/swarm.pem
+
+        - name: update ca-certificates
+          command: update-ca-certificates
+
+        - name: restart docker
+          systemd:
+            name: docker
+            state: restarted

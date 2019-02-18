@@ -1,6 +1,6 @@
 ## ![swarm.png](https://github.com/daper/swarm-cluster/raw/master/resources/swarm.png "Swarm Icon") High Availability Cluster
 
-This project aims to analyze and give an arquitecture solucition for a high availability cluster of a common 3 layer stack; composed by database, app and front-end. In order to achive that purpose it uses the following tools:
+This project aims to analyze and give an arquitecture solution for a high availability cluster of a common 3 layer stack; composed by database, app and front-end. In order to achive that purpose it uses the following tools:
 
 - __Ansible__ an open-source software provisioning.
 - __CoreOS__ as base operative system. Which comes also with __docker__.
@@ -8,7 +8,7 @@ This project aims to analyze and give an arquitecture solucition for a high avai
 - __ceph__ a unified and distributed storage system.
 	* _deploy scripts not finished yet_.
 - __portainer.io__ a beautiful GUI to manage swarm clusters.
-- __prometheus.io__ which which are also deployed:
+- __prometheus.io__ whith which are also deployed:
 	* __node-exporter__ exports system and node data to prometheus.
 	* __dockerd-exporter__ exports docker related metrics to prometheus.
 	* __alertmanager__ triggers alerts based on metrics.
@@ -190,24 +190,30 @@ docker stack up -c docker-compose.yml db
 
 #### PHP-FPM
 
-The app services will run on php-fpm using [this repository](https://github.com/daper/docker-alpine-php) I did 3 years ago (at the time of writing this) based on an alpine image. That builds different versions of php with php-fpm and many extensions.
+Alpine image based php with the following extensions:
 
-_Note: a docker image based on that must be created and stored on the cluster's docker registry to deploy it globally._
+- exif
+- mysqli
+- pdo_mysql
+- sockets
+- gd
+- igbinary
+- redis
+
+It also has `composer` in the path.
+
+_Note: description pending to complete. See script resources/create-images.sh_
 
 ```
-docker service create --name php-fpm \
-	--network appnet \
-	--hostname '{{.Node.Hostname}}-php-fpm' \
-	--mode global \
-	--constraint 'node.labels.type == app' \
-	daper/docker-alpine-php:7.1-tcp
+cd php-fpm
+docker stack up -c docker-compose.yml php
 ```
 
 #### Nginx
 
 Nginx will be deployed as an alpine-based image stored in a docker registry inside the cluster. This will do the compilation of nginx itself with ModSecurity. Also WAF rules will be bundled in. Alongside the letsencrypt certificates.
 
-_Note: this part is pending._
+_Note: description pending to write. See folder nginx-waf_
 
 ### Extras
 
@@ -215,5 +221,17 @@ _Note: this part is pending._
 - `resources/create-networks.sh`, script for creating the 3 (dbnet, appnet and frontnet) overlay networks that this cluster relies on.
 - `resources/generate-certs.sh`, script for manually generate certificates for hosts.
 - `resources/known_hosts.sh`, script that pings ssh for every host in ansible's hosts file.
+
+### To-Do
+
+All pending tasks are on `tasks.txt` run `./resources/task-completion.sh` to see the following info:
+
+```
+Total:           63
+Incompleted:     15
+Completed:       48
+---------------------
+You have done    76%
+```
 
 > @author David Peralta <david@daper.email>
