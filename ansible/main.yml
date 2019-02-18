@@ -1,13 +1,5 @@
 
-- name: "bootstrap coreos hosts with ansible"
-  hosts: all
-  gather_facts: false
-  roles:
-    - defunctzombie.coreos-bootstrap
-  tasks:
-    - name: Install docker-py
-      pip:
-        name: docker-py
+- import_playbook: "{{ playbook_dir }}/playbooks/python.yml"
 
 - name: "bootstrap coreos hosts with custom script"
   hosts: all
@@ -60,7 +52,7 @@
       lineinfile: dest=/etc/hosts regexp='^.*{{ item }}$' line="{{ hostvars[item].private_ip }} {{item}}" state=present
       with_inventory_hostnames:
         - all
-      # when: 'private_ip not in eth1.stdout'
+      when: 'private_ip not in eth1.stdout'
     - name: Get docker info
       shell: docker info
       register: docker_info

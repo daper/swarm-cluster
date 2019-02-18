@@ -1,0 +1,83 @@
+- name: setup python for coreos
+  hosts: all
+  gather_facts: False # would fail since Python isn't installed
+  vars:
+    ap_releases: https://downloads.activestate.com/ActivePython/releases
+    ap_python3_version: 3.6.6.3606
+    ap_python3_revision: 10a6f8f1
+    ap_python3_package_name: "ActivePython-{{ap_python3_version}}-linux-x86_64-glibc-2.12"
+    ap_python3_folder_name: "{{ap_python3_package_name}}-{{ap_python3_revision}}"
+    ap_python3_package_file_name: "{{ap_python3_package_name}}.tar.gz"
+    ap_python3_package_download_url: "{{ap_releases}}/{{ap_python3_version}}/{{ap_python3_package_file_name}}"
+  tasks:
+    # Check if the python has already been downloaded, skip this whole play
+    - block:
+        - name: check for installed python3 (in opt/bin)
+          raw: "[ -f /opt/bin/python3 ] && echo 'installed' || echo 'missing'"
+          register: py3_check
+
+        - meta: end_play
+          when: py3_check.stdout_lines[0] == "installed"
+
+    - name: check for downloaded ActivePython package
+      raw: "[ -f {{ap_python3_package_file_name}} ] && echo 'present' || echo 'missing'"
+      register: package_check
+
+    - name: download ActivePython
+      raw: wget {{ap_python3_package_download_url}}
+      when: package_check.stdout_lines[0] == "missing"
+
+    - name: check for unzipped ActivePython package folder
+      raw: "[ -d {{ap_python3_folder_name}} ] && echo 'present' || echo 'missing'"
+      register: package_folder_check
+
+    - name: unzip ActivePython
+      raw: tar -xvf {{ap_python3_package_file_name}}
+      when: package_folder_check.stdout_lines[0] == "missing"
+
+    - name: create the resulting directory for ActivePython
+      become: true
+      raw: 'mkdir -p /opt/bin/active_python'
+
+    - name: install ActivePython
+      become: true
+      raw: 'cd {{ap_python3_folder_name}} && ./install.sh -I /opt/active_python'
+
+    # Setup links
+    - name: link easy_install
+      become: true
+      raw: ln -sf /opt/active_python/bin/easy_install /opt/bin/easy_install
+    - name: link pip
+      become: true
+      raw: ln -sf /opt/active_python/bin/pip /opt/bin/pip
+    - name: link pip3
+      become: true
+      raw: ln -sf /opt/active_python/bin/pip /opt/bin/pip3
+    - name: link python
+      become: true
+      raw: ln -sf /opt/active_python/bin/python3 /opt/bin/python
+    - name: link python3
+      become: true
+      raw: ln -sf /opt/active_python/bin/python3 /opt/bin/python3
+    - name: link virtualenv
+      become: true
+      raw: ln -sf /opt/active_python/bin/virtualenv /opt/bin/virtualenv
+
+    # Remove downloads
+    - name: remove downloaded tar.gz
+      file:
+        state: absent
+        path: '{{ap_python3_package_file_name}}'
+      when: package_check.stdout_lines[0] == "missing"
+
+    - name: remove extracted python folder
+      file:
+        state: absent
+        path: '{{ap_python3_folder_name}}'
+      when: package_folder_check.stdout_lines[0] == "missing"
+
+    # Install docker modules
+    - name: install docker package
+      become: true
+      pip:
+        name: docker
